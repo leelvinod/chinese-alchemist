@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/mandarin-mitra-overview/"
+title = "Mandarin Mitra — Project Overview"
+description = "An eight-slide overview of Mandarin Mitra covering the learner problem, audience, learning loop, MVP features, technology, current limitations, and proposed next steps."
+version = "1.0.0"
+id = "artifacts/mandarin-mitra-overview"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/mandarin-mitra-overview/" ]
+localPort = 24615
+
+[services.development]
+run = "pnpm --filter @workspace/mandarin-mitra-overview run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mandarin-mitra-overview", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mandarin-mitra-overview/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24615"
+BASE_PATH = "/mandarin-mitra-overview/"

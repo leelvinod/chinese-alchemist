@@ -1,0 +1,10 @@
+[
+  {"id":"f15a9001-77b8-48dc-9001-1a8ea18fd101","position":1,"filepath":"src/pages/slides/Opening.tsx","title":"Mandarin Mitra","description":"The three-minute learning promise.","speakerNotes":""},
+  {"id":"f15a9002-77b8-48dc-9002-1a8ea18fd102","position":2,"filepath":"src/pages/slides/Problem.tsx","title":"The learner problem","description":"Word order and transfer challenges.","speakerNotes":""},
+  {"id":"f15a9003-77b8-48dc-9003-1a8ea18fd103","position":3,"filepath":"src/pages/slides/Audience.tsx","title":"Built for Indian learners","description":"English instruction with Hindi as the bridge.","speakerNotes":""},
+  {"id":"f15a9004-77b8-48dc-9004-1a8ea18fd104","position":4,"filepath":"src/pages/slides/CoreLoop.tsx","title":"The three-minute learning loop","description":"Build, correct, and strengthen.","speakerNotes":""},
+  {"id":"f15a9005-77b8-48dc-9005-1a8ea18fd105","position":5,"filepath":"src/pages/slides/Features.tsx","title":"What the MVP includes","description":"The working learning surfaces.","speakerNotes":""},
+  {"id":"f15a9006-77b8-48dc-9006-1a8ea18fd106","position":6,"filepath":"src/pages/slides/Technology.tsx","title":"How it works today","description":"A local-first React architecture.","speakerNotes":""},
+  {"id":"f15a9007-77b8-48dc-9007-1a8ea18fd107","position":7,"filepath":"src/pages/slides/Limitations.tsx","title":"Current MVP boundaries","description":"Clear distinctions between working and planned capabilities.","speakerNotes":""},
+  {"id":"f15a9008-77b8-48dc-9008-1a8ea18fd108","position":8,"filepath":"src/pages/slides/NextSteps.tsx","title":"Proposed next steps","description":"The path from MVP to a launch-ready product.","speakerNotes":""}
+]

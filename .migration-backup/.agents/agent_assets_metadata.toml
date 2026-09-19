@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "zHO-8bPHmQiHGTMhw4U0f"
+uri = "file://screenshots/current-screen.jpg"
+type = "image"
+title = "Mandarin Mitra — live welcome screen"
+description = "Current screenshot of the running app."
+logical_id = "d5a118c4-74e6-47cd-b647-59a6ebb1f274"
+content_hash = "sha256:a6a5089373d8b61c41439644121159dc26258eac603664a0ab4fb765f5610a0f"
+size = 32925
+mtime_ms = 1789814212681
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:bbf5e1c3-1d46-4c9d-adba-307a21bf9d09/d5a118c4-74e6-47cd-b647-59a6ebb1f274/b7b5485b-60f1-45cd-b03f-5aad84ca7ea0"
+storage_version_token = "1789814218758979"
+content_type = "image/jpeg"
