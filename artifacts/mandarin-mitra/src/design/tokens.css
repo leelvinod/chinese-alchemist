@@ -1,0 +1,141 @@
+/* Mandarin Mitra — design tokens.
+   The Classical palette and type scale from the design handoff (deliverable 1).
+   Theme-scoped --mm-* variables are set in JS by ThemeScope; everything that
+   does not change between themes lives here. */
+
+:root {
+  --color-accent: #b68235;
+
+  --color-accent-100: #fff3e4;
+  --color-accent-200: #ffe3bf;
+  --color-accent-700: #7d5411;
+  --color-accent-800: #5a3b0a;
+
+  --font-heading: 'Cormorant Garamond', Georgia, serif;
+  --font-heading-weight: 600;
+  --font-body: 'Lora', Georgia, serif;
+  --font-zh: 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-py: 'Noto Serif', 'Lora', serif;
+  --font-dv: 'Noto Sans Devanagari', sans-serif;
+
+  --space-1: 4.6px;
+  --space-2: 9.2px;
+  --space-3: 13.8px;
+  --space-4: 18.4px;
+  --space-6: 27.6px;
+  --space-8: 36.8px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 7px;
+
+  /* Feedback accents. A separate system from the slot colours — see §14 of the
+     handoff. No red anywhere: an error is amber plus a question. */
+  --fb-correct: #4a7a52;
+  --fb-minor: #a06f24;
+  --fb-neutral: #7d7979;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--mm-bg, #f3f2f2);
+  color: var(--mm-ink, #201f1d);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  height: 100%;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-body);
+  color: inherit;
+}
+
+input,
+textarea {
+  font-family: var(--font-body);
+}
+
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--mm-accent, var(--color-accent));
+  outline-offset: 2px;
+}
+::selection {
+  background: color-mix(in srgb, var(--mm-accent, var(--color-accent)) 30%, transparent);
+}
+
+/* Figures — streaks, due counts, intervals, timers — are always tabular. */
+.mm-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-kicker {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mm-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes mm-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes mm-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.mm-fade-up {
+  animation: mm-fade-up 0.24s ease both;
+}
+
+/* Motion is limited to short transitions, and reduce-motion is respected. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

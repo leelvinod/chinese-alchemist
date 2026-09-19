@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Mandarin Mitra"
+description = "Mandarin Mitra is an interactive Mandarin learning experience that helps learners practice language skills through the original app’s lessons, activities, and interface."
+version = "1.0.0"
+id = "artifacts/mandarin-mitra"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21016
+
+[services.development]
+run = "pnpm --filter @workspace/mandarin-mitra run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mandarin-mitra", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mandarin-mitra/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21016"
+BASE_PATH = "/"
