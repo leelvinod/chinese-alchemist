@@ -85,3 +85,22 @@ describe('planSession', () => {
     expect(planSession(base).reviewCap).toBe(8);
   });
 });
+
+describe('coverage across the level range', () => {
+  it('reaches HSK 4 patterns for a learner placed there', () => {
+    expect(availablePatterns(4).some((p) => p.hsk === 4)).toBe(true);
+  });
+
+  it('offers more than one pattern at every level, so the focus can rotate', () => {
+    for (const lv of [1, 2, 3, 4]) {
+      expect(PATTERNS.filter((p) => p.hsk === lv).length, `HSK ${lv}`).toBeGreaterThan(1);
+    }
+  });
+
+  it('gives an HSK 1 learner a full ladder to climb without leaving their level', () => {
+    const kinds = new Set(availablePatterns(1).flatMap((p) => p.drills.map((d) => d.kind)));
+    for (const k of ['reorder', 'fill', 'transform', 'translate', 'sayit']) {
+      expect(kinds.has(k as never), k).toBe(true);
+    }
+  });
+});

@@ -8,11 +8,12 @@ import { Btn, Divider, Sheet, SheetTitle, Shimmer, TransferCard } from '../desig
 import { Icon } from '../design/Icon';
 import { SentenceLine } from '../design/Sentence';
 import type { SentenceChunk } from '../design/Sentence';
-import { fbCorrect, fbMinor } from '../design/slots';
+import { MM_PY, MM_ZH, fbCorrect, fbMinor } from '../design/slots';
 import type { Ui } from '../design/slots';
-import type { GradeResult } from '../engine/grader';
+import type { Diagnosis, GradeResult } from '../engine/grader';
 import type { Pattern, Sentence } from '../content/types';
 import { ERROR_HINDI_NOTE } from '../engine/errors';
+import { toneGlyph } from './Listening';
 
 export type FeedbackPhase = 'grading' | 'correct' | 'minor' | 'self' | 'model' | 'queued' | 'failed';
 
@@ -144,6 +145,7 @@ export function Feedback({
           showHindi={false}
         />
         <p style={{ fontSize: 14, margin: '14px 0 0' }}>{diag?.prompt}</p>
+        {diag?.sound && <SoundNote ui={ui} diag={diag} />}
         <div style={{ marginTop: 14 }}>
           <Btn onClick={onRetry}>Try again</Btn>
         </div>
@@ -189,6 +191,8 @@ export function Feedback({
         {rule ?? pattern.rule}
       </p>
 
+      {diag?.sound && <SoundNote ui={ui} diag={diag} />}
+
       {/* At most one transfer card per answer, and it can be dismissed. */}
       {ui.hindi !== 'off' && transferOpen && (hindiNote || pattern.transfer) && (
         <TransferCard
@@ -221,6 +225,44 @@ export function Feedback({
         </div>
       )}
     </Sheet>
+  );
+}
+
+/** Tone and phoneme feedback, kept coarse: one syllable, one contour, no pitch
+ *  track. Tones are shape, never a second colour system. */
+function SoundNote({ ui, diag }: { ui: Ui; diag: Diagnosis }) {
+  const s = diag.sound;
+  if (!s) return null;
+  const c = fbMinor(ui);
+  const toneNote = s.wantTone !== s.gotTone && s.wantPy.slice(0, -1) !== s.gotPy.slice(0, -1);
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        border: `1px solid ${c}`,
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 12px',
+        marginTop: 12,
+      }}
+    >
+      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 'none' }}>
+        <span style={{ fontFamily: MM_PY, fontSize: 22, color: c, lineHeight: 1 }}>
+          {toneGlyph(s.wantTone)}
+        </span>
+        <span style={{ fontSize: 9.5, color: 'var(--mm-muted)', marginTop: 3 }}>wanted</span>
+      </span>
+      <span style={{ fontSize: 12.5, lineHeight: 1.55, flex: 1 }}>
+        <span style={{ fontFamily: MM_ZH, fontSize: 17 }}>{s.wantZh}</span>{' '}
+        <span style={{ fontFamily: MM_PY, color: 'var(--mm-muted)' }}>{s.wantPy}</span>
+        <span style={{ display: 'block', color: 'var(--mm-muted)', marginTop: 2 }}>
+          We heard <span style={{ fontFamily: MM_PY }}>{s.gotPy}</span>
+          {toneNote ? '' : ` — tone ${s.gotTone === 5 ? 'neutral' : s.gotTone}, not ${s.wantTone === 5 ? 'neutral' : s.wantTone}`}
+          .
+        </span>
+      </span>
+    </div>
   );
 }
 

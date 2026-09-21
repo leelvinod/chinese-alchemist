@@ -78,6 +78,8 @@ export const MINI_MODULES: MiniModule[] = [
     blurb:
       'Chinese splits the family tree the way Hindi does — by side and by age. Where English has one word, both languages have four.',
     items: [
+      { zh: '妈妈', py: 'māma', hindi: 'maa', hindiDeva: 'माँ', en: 'mother' },
+      { zh: '爸爸', py: 'bàba', hindi: 'papa', hindiDeva: 'पापा', en: 'father' },
       { zh: '舅舅', py: 'jiùjiu', hindi: 'maama', hindiDeva: 'मामा', en: "mother's brother" },
       { zh: '叔叔', py: 'shūshu', hindi: 'chacha', hindiDeva: 'चाचा', en: "father's younger brother" },
       { zh: '伯伯', py: 'bóbo', hindi: 'taaya', hindiDeva: 'ताया', en: "father's older brother" },

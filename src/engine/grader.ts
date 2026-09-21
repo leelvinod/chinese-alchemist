@@ -16,6 +16,7 @@ import type { Sentence } from '../content/types';
 import type { ErrorCode } from './errors';
 import { selfCorrectPrompt } from './errors';
 import { CONNECTOR_PAIRS } from '../content/patterns';
+import { fullyReadable, readingsOf, soundDiff } from '../content/pinyin';
 
 export type Verdict = 'correct' | 'minor' | 'error';
 
@@ -27,6 +28,16 @@ export interface Diagnosis {
   belongsAt?: number;
   /** The one-line prompt for FB-01. */
   prompt: string;
+  /** Set on a spoken answer whose sounds were right but a syllable drifted: the
+   *  syllable wanted, what was heard, and the tone to draw a contour for. */
+  sound?: {
+    wantZh: string;
+    gotZh: string;
+    wantPy: string;
+    gotPy: string;
+    wantTone: number;
+    gotTone: number;
+  };
 }
 
 export interface GradeResult {
@@ -216,6 +227,104 @@ function missingChunks(answerChunks: string[], targetChunks: string[]): string[]
 export interface GradeOptions {
   /** 'build' and 'sayit' are graded loosely: the learner is composing. */
   loose?: boolean;
+  /** The answer came from the microphone, so a mismatch may be a tone or a
+   *  phoneme rather than the wrong word. */
+  spoken?: boolean;
+}
+
+/** Tone marks, for naming the syllable the learner drifted on. */
+const TONE_MARKS: Record<string, string[]> = {
+  a: ['ā', 'á', 'ǎ', 'à', 'a'],
+  e: ['ē', 'é', 'ě', 'è', 'e'],
+  i: ['ī', 'í', 'ǐ', 'ì', 'i'],
+  o: ['ō', 'ó', 'ǒ', 'ò', 'o'],
+  u: ['ū', 'ú', 'ǔ', 'ù', 'u'],
+  v: ['ǖ', 'ǘ', 'ǚ', 'ǜ', 'ü'],
+};
+
+/** Write a toneless syllable back with its tone mark, e.g. ming + 2 -> míng. */
+export function withTone(base: string, tone: number): string {
+  const order = ['a', 'o', 'e', 'v', 'i', 'u'];
+  const i = order.map((v) => base.indexOf(v)).findIndex((n) => n >= 0);
+  const vowel = order[i];
+  if (!vowel) return base;
+  const at = base.indexOf(vowel);
+  const marked = TONE_MARKS[vowel]?.[Math.min(4, Math.max(1, tone)) - 1] ?? vowel;
+  return base.slice(0, at) + marked + base.slice(at + 1);
+}
+
+/** A spoken answer whose characters differ from the target may still be the
+ *  right sounds: the learner hit the syllable and missed the tone, or swapped
+ *  -n for -ng. Those are pronunciation errors, not word-choice ones, and the
+ *  MVP reports them coarsely — one syllable, one contour, no pitch track. */
+function diagnoseSpoken(answer: string, target: Sentence): Diagnosis[] {
+  const a = normalise(answer);
+  const t = normalise(target.zh);
+
+  // Only comparable when both sides are the same length in characters and we
+  // can read every one of them.
+  if (a.length !== t.length || !fullyReadable(a) || !fullyReadable(t)) return [];
+
+  const want = readingsOf(t);
+  const got = readingsOf(a);
+  if (want.length !== got.length) return [];
+
+  for (let i = 0; i < want.length; i++) {
+    const w = want[i];
+    const g = got[i];
+    if (!w || !g || w.zh === g.zh) continue;
+
+    const diff = soundDiff(w.base, g.base);
+
+    // Same syllable, different tone: the one case the MVP calls a tone error.
+    if (diff === null && w.tone !== g.tone) {
+      const code: ErrorCode = 'TONE.wrong_tone';
+      return [
+        {
+          code,
+          chunk: w.zh,
+          prompt: selfCorrectPrompt(code),
+          sound: {
+            wantZh: w.zh,
+            gotZh: g.zh,
+            wantPy: withTone(w.base, w.tone),
+            gotPy: withTone(g.base, g.tone),
+            wantTone: w.tone,
+            gotTone: g.tone,
+          },
+        },
+      ];
+    }
+
+    const code: ErrorCode | null =
+      diff === 'nasal'
+        ? 'PHONEME.nasal_final_drop'
+        : diff === 'aspiration'
+          ? 'PHONEME.aspiration'
+          : diff === 'retroflex'
+            ? 'PHONEME.retroflex'
+            : null;
+
+    if (code) {
+      return [
+        {
+          code,
+          chunk: w.zh,
+          prompt: selfCorrectPrompt(code),
+          sound: {
+            wantZh: w.zh,
+            gotZh: g.zh,
+            wantPy: withTone(w.base, w.tone),
+            gotPy: withTone(g.base, g.tone),
+            wantTone: w.tone,
+            gotTone: g.tone,
+          },
+        },
+      ];
+    }
+  }
+
+  return [];
 }
 
 export function grade(answer: string, target: Sentence, opts: GradeOptions = {}): GradeResult {
@@ -238,6 +347,13 @@ export function grade(answer: string, target: Sentence, opts: GradeOptions = {})
 
   const answerChunks = attemptChunks.map((c) => c.zh);
   const targetChunks = chunkStrings(target);
+
+  // A spoken answer that is the right sounds with a drifted tone is a
+  // pronunciation error, and saying "wrong word" would be misleading.
+  if (opts.spoken) {
+    const sound = diagnoseSpoken(answer, target);
+    if (sound.length > 0) return { verdict: 'error', pass: false, diagnoses: sound, attemptChunks };
+  }
 
   // A known habit or a missing particle explains the difference on its own.
   const lexis = diagnoseLexis(answer, target);

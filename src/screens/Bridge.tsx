@@ -493,32 +493,11 @@ function ModuleDetail({ ui, mod, onClose }: { ui: Ui; mod: MiniModule; onClose: 
         <p style={{ fontSize: 13.5, color: 'var(--mm-muted)', lineHeight: 1.6 }}>{mod.blurb}</p>
       </div>
 
-      {/* Kinship is a visual tree, not a list: the pairs only make sense by side. */}
+      {/* Kinship is drawn as a tree, because the whole point is that the words
+          are positions on it: which side, which generation, older or younger. A
+          list would lose exactly the thing Hindi and Chinese share. */}
       {mod.kind === 'tree' ? (
-        <div style={{ marginTop: 20 }}>
-          {[
-            { side: "Mother's side", ids: ['舅舅', '姨', '外公', '外婆'] },
-            { side: "Father's side", ids: ['叔叔', '伯伯', '姑姑', '爷爷', '奶奶'] },
-            { side: 'Your generation', ids: ['哥哥', '弟弟', '姐姐', '妹妹'] },
-          ].map((branch) => (
-            <div key={branch.side} style={{ marginBottom: 18 }}>
-              <div
-                className="mm-kicker"
-                style={{ color: 'var(--mm-accent)', marginBottom: 8, paddingBottom: 5, borderBottom: '1px solid var(--mm-line)' }}
-              >
-                {branch.side}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 10 }}>
-                {branch.ids
-                  .map((zh) => mod.items.find((it) => it.zh === zh))
-                  .filter((it): it is MiniModule['items'][number] => !!it)
-                  .map((it) => (
-                    <Pair key={it.zh} item={it} hindi={hindiOf(it)} ui={ui} onPlay={() => tts.speak(it.zh, { rate: state.settings.ttsRate })} />
-                  ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <KinshipTree mod={mod} ui={ui} onPlay={(zh) => tts.speak(zh, { rate: state.settings.ttsRate })} />
       ) : (
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {mod.items.map((it) => (
@@ -581,6 +560,163 @@ function Pair({
       >
         <Icon name="sound" size={16} />
       </button>
+    </div>
+  );
+}
+
+/* ── the kinship tree ───────────────────────────────────────────────────── */
+
+const SPINE = '1px solid var(--mm-line)';
+
+function KinshipTree({
+  mod,
+  ui,
+  onPlay,
+}: {
+  mod: MiniModule;
+  ui: Ui;
+  onPlay: (zh: string) => void;
+}) {
+  const find = (zh: string) => mod.items.find((it) => it.zh === zh);
+  const hindiOf = (it: MiniModule['items'][number]) => (ui.hindi === 'roman' ? it.hindi : it.hindiDeva);
+
+  const Node = ({ zh, highlight }: { zh: string; highlight?: boolean }) => {
+    const it = find(zh);
+    if (!it) return null;
+    return (
+      <button
+        onClick={() => onPlay(it.zh)}
+        aria-label={`${it.zh}, ${it.py}, ${it.en}`}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: 1,
+          width: '100%',
+          minHeight: 48,
+          padding: '6px 8px',
+          border: `1px solid ${highlight ? 'var(--mm-accent)' : 'var(--mm-line)'}`,
+          borderRadius: 'var(--radius-md)',
+          background: highlight ? 'color-mix(in srgb, var(--mm-accent) 8%, transparent)' : 'var(--mm-surface)',
+          color: 'var(--mm-ink)',
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+          <span style={{ fontFamily: MM_ZH, fontSize: 17, lineHeight: 1.25 }}>{it.zh}</span>
+          <span style={{ fontFamily: MM_PY, fontSize: 10.5, color: 'var(--mm-muted)' }}>{it.py}</span>
+        </span>
+        {ui.hindi !== 'off' && (
+          <span
+            style={{
+              fontFamily: ui.hindi === 'roman' ? MM_PY : MM_DV,
+              fontSize: 11,
+              lineHeight: 1.7,
+              color: 'var(--mm-muted)',
+            }}
+          >
+            {hindiOf(it)}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  /** A generation band: the label on a rule, then one stack per side. */
+  const Band = ({
+    label,
+    left,
+    right,
+  }: {
+    label: string;
+    left: string[];
+    right: string[];
+  }) => (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px' }}>
+        <span className="mm-kicker" style={{ color: 'var(--mm-muted)', whiteSpace: 'nowrap' }}>
+          {label}
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'var(--mm-line)' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 10, borderRight: SPINE }}>
+          {left.map((zh) => (
+            <Node key={zh} zh={zh} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {right.map((zh) => (
+            <Node key={zh} zh={zh} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      {/* Which side you are counting from is the first question Chinese asks,
+          and Hindi asks it too — so it heads the tree. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+        <div className="mm-kicker" style={{ color: 'var(--mm-accent)' }}>
+          Mother's side
+        </div>
+        <div className="mm-kicker" style={{ color: 'var(--mm-accent)' }}>
+          Father's side
+        </div>
+      </div>
+
+      <Band label="Grandparents" left={['外公', '外婆']} right={['爷爷', '奶奶']} />
+      <Band label="Their children" left={['妈妈', '舅舅', '姨']} right={['爸爸', '叔叔', '伯伯', '姑姑']} />
+
+      {/* The two spines join above you. */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 0' }}>
+        <span style={{ width: '50%', height: 12, borderTop: SPINE, borderLeft: SPINE, borderRight: SPINE, borderRadius: '4px 4px 0 0' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <span style={{ width: 1, height: 10, background: 'var(--mm-line)' }} />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 8px' }}>
+        <span className="mm-kicker" style={{ color: 'var(--mm-muted)', whiteSpace: 'nowrap' }}>
+          You and your siblings
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'var(--mm-line)' }} />
+      </div>
+
+      {/* Age splits this generation in both languages, so it is an axis, not a list. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <Node zh="哥哥" />
+        <Node zh="姐姐" />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+        <span
+          style={{
+            fontSize: 10.5,
+            letterSpacing: '.08em',
+            textTransform: 'uppercase',
+            color: 'var(--mm-accent)',
+            border: '1px solid var(--mm-accent)',
+            borderRadius: 20,
+            padding: '3px 12px',
+          }}
+        >
+          You
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <Node zh="弟弟" />
+        <Node zh="妹妹" />
+      </div>
+
+      <p style={{ fontSize: 11.5, color: 'var(--mm-muted)', lineHeight: 1.6, marginTop: 14 }}>
+        Older above, younger below. Chinese marks the split the way Hindi does —
+        {ui.hindi === 'roman' ? ' bade bhai and chhote bhai' : ' बड़े भाई और छोटे भाई'} — where English
+        has only "brother".
+      </p>
     </div>
   );
 }

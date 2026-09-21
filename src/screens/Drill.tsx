@@ -257,7 +257,7 @@ export function Drill({
               // The transcript is the answer; grade it as soon as it lands.
               setPhase('grading');
               timer.current = window.setTimeout(() => {
-                const r = grade(t, target, { loose: true });
+                const r = grade(t, target, { loose: true, spoken: true });
                 setResult(r);
                 if (attempt === 0) setFirstAttempt(r.attemptChunks);
                 setPhase(r.verdict === 'correct' ? 'correct' : attempt === 0 ? 'self' : 'model');

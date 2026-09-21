@@ -9,6 +9,7 @@ import { MINIMAL_PAIRS, TONE_PAIRS } from './listening';
 import { MINI_MODULES, PINYIN_FINALS, PINYIN_INITIALS } from './bridge';
 import { PLACEMENT_ITEMS } from './placement';
 import { MM_SLOT } from '../design/slots';
+import { READINGS, readingOf } from './pinyin';
 import { grade, normalise } from '../engine/grader';
 import { DRILL_ORDER, blankIndex } from './types';
 
@@ -361,5 +362,53 @@ describe('placement bank', () => {
 
   it('offers enough items to reach the minimum test length without repeating', () => {
     expect(PLACEMENT_ITEMS.length).toBeGreaterThanOrEqual(15);
+  });
+});
+
+describe('character readings', () => {
+  /** Every hanzi the learner can be shown, from every corner of the content. */
+  const allHanzi = (): { ch: string; where: string }[] => {
+    const out: { ch: string; where: string }[] = [];
+    const add = (text: string, where: string) => {
+      for (const ch of text) if (ch >= '\u4e00' && ch <= '\u9fff') out.push({ ch, where });
+    };
+    for (const p of PATTERNS) {
+      for (const s of [...p.examples, ...p.drills.map((d) => d.target)]) add(s.zh, p.id);
+      for (const d of p.drills) {
+        for (const c of d.chips ?? []) add(c, d.id);
+        for (const c of d.clauses ?? []) add(c, d.id);
+        if (d.from) add(d.from.zh, d.id);
+      }
+    }
+    for (const w of VOCAB) {
+      add(w.zh, w.id);
+      add(w.example, w.id);
+      if (w.measure) add(w.measure, w.id);
+    }
+    for (const t of TONE_PAIRS) add(t.zh, t.py);
+    for (const m of MINIMAL_PAIRS) {
+      add(m.a.zh, m.id);
+      add(m.b.zh, m.id);
+    }
+    for (const mod of MINI_MODULES) for (const it of mod.items) add(it.zh, mod.id);
+    for (const i of PLACEMENT_ITEMS) {
+      add(i.answer, i.id);
+      for (const o of i.options ?? []) add(o, i.id);
+      for (const t of i.tiles ?? []) add(t, i.id);
+    }
+    return out;
+  };
+
+  it('knows a reading for every character in the content', () => {
+    const missing = [...new Map(allHanzi().filter((h) => !readingOf(h.ch)).map((h) => [h.ch, h])).values()];
+    expect(missing.map((m) => `${m.ch} (${m.where})`)).toEqual([]);
+  });
+
+  it('gives every reading a toneless base and a tone in 1-5', () => {
+    for (const [ch, r] of Object.entries(READINGS)) {
+      expect(r.base, ch).toMatch(/^[a-z]+$/);
+      expect(r.tone, ch).toBeGreaterThanOrEqual(1);
+      expect(r.tone, ch).toBeLessThanOrEqual(5);
+    }
   });
 });
