@@ -15,6 +15,7 @@ import type { ErrorCode } from '../engine/errors';
 import { drainQueue } from '../engine/queue';
 import type { QueuedAnswer } from '../engine/queue';
 import { VOCAB } from '../content/vocab';
+import type { ImportedWord } from '../engine/import';
 
 const KEY = 'mandarin-mitra:v1';
 
@@ -44,6 +45,7 @@ export type Action =
   | { type: 'tonePairResult'; key: string; right: boolean }
   | { type: 'minimalPairResult'; contrast: string; right: boolean }
   | { type: 'dismissTransfer'; id: string }
+  | { type: 'importWords'; words: ImportedWord[] }
   | { type: 'reset' };
 
 function bumpStreak(state: AppState): AppState['progress'] {
@@ -231,6 +233,23 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'dismissTransfer':
       return { ...state, dismissedTransfer: [...state.dismissedTransfer, action.id] };
 
+    case 'importWords': {
+      const have = new Set(state.imported.map((w) => w.id));
+      const add = action.words.filter((w) => !have.has(w.id));
+      if (add.length === 0) return state;
+      return {
+        ...state,
+        imported: [...state.imported, ...add],
+        progress: {
+          ...state.progress,
+          // Imported words join the review deck straight away, which is the only
+          // reason to import them.
+          cards: [...state.progress.cards, ...add.flatMap((w) => cardsFor(w.id))],
+          seenWords: [...new Set([...state.progress.seenWords, ...add.map((w) => w.id)])],
+        },
+      };
+    }
+
     case 'reset':
       return initialState();
 
@@ -257,6 +276,7 @@ function load(): AppState {
       ...parsed,
       settings: { ...base.settings, ...(parsed.settings ?? {}) },
       progress: { ...base.progress, ...(parsed.progress ?? {}) },
+      imported: parsed.imported ?? [],
     };
   } catch {
     return initialState();

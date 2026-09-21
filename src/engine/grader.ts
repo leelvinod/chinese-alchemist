@@ -377,14 +377,19 @@ export function grade(answer: string, target: Sentence, opts: GradeOptions = {})
   const missing = missingChunks(answerChunks, targetChunks);
   const extra = missingChunks(targetChunks, answerChunks);
 
-  // Same pieces, wrong order.
-  if (missing.length === 0 && extra.length === 0) {
-    const order = diagnoseOrder(answerChunks, targetChunks, target);
+  // Word order is checked on whatever the learner did use, not only on a perfect
+  // set of pieces. Loose grading forgives a missing or extra word — it must never
+  // forgive the order, because the order is the thing being taught.
+  const used = answerChunks.filter((z) => targetChunks.includes(z));
+  const wanted = targetChunks.filter((z) => used.includes(z));
+  if (used.length >= 2) {
+    const order = diagnoseOrder(used, wanted, target);
     if (order.length > 0) return { verdict: 'error', pass: false, diagnoses: order, attemptChunks };
   }
 
-  // Free composition: if the learner used the pattern's shape and nothing above
-  // fired, accept it. The hosted grader will judge these properly.
+  // Free composition: if the learner used the pattern's shape, in the right
+  // order, and nothing above fired, accept it. The hosted grader will judge
+  // these properly.
   if (opts.loose && missing.length <= targetChunks.length - 2 && extra.length <= 2) {
     return { verdict: 'correct', pass: true, diagnoses: [], attemptChunks };
   }

@@ -2,12 +2,18 @@
    Settings are grouped the way the handoff groups them, and every control here
    changes something the learner can see immediately. */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Btn, Chip, Kicker, Screen, TopBar } from '../design/ui';
 import { Icon } from '../design/Icon';
 import { MM_DV, MM_PY, MM_ZH } from '../design/slots';
 import { useStore } from '../state/store';
 import { FREE_VOICE_CAP, GOAL_LABEL } from '../state/model';
+import { askNotifyPermission, notifyPermission } from '../engine/notify';
+import { parseWordList } from '../engine/import';
+import type { ImportReport } from '../engine/import';
+import type { NotifyPermission } from '../engine/notify';
+import { SLOT_LABEL, formatClock, nextReminderAt, parseClock, reminderTier, slotTimes } from '../engine/reminders';
+import { daysBetween } from '../engine/reminders';
 import type { Goal, ReminderSlot, Settings } from '../state/model';
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
@@ -123,6 +129,9 @@ export function Me({
 }) {
   const { state, dispatch, voiceLeft } = useStore();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [notify, setNotify] = useState<NotifyPermission>('default');
+  const [report, setReport] = useState<ImportReport | null>(null);
+  useEffect(() => setNotify(notifyPermission()), []);
   const s = state.settings;
   const set = (patch: Partial<Settings>) => dispatch({ type: 'setSettings', patch });
 
@@ -233,7 +242,12 @@ export function Me({
       </Group>
 
       <Group title="Reminders">
-        <Row label="Time slots" hint={s.reminders.length === 0 ? 'None' : s.reminders.join(', ')}>
+        <Row
+          label="Time slots"
+          hint={
+            s.reminders.length === 0 ? 'None' : s.reminders.map((r) => SLOT_LABEL[r]).join(' · ')
+          }
+        >
           <span style={{ display: 'flex', gap: 5 }}>
             {(['morning', 'lunch', 'evening'] as ReminderSlot[]).map((r) => (
               <button
@@ -262,13 +276,99 @@ export function Me({
             ))}
           </span>
         </Row>
-        <Row label="Answer in the notification" hint="Keep your streak without opening the app">
+        <Row label="Custom time" hint={parseClock(s.customReminder) === null ? 'Not a time — this slot is skipped' : 'Used by the Custom slot'}>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              value={s.customReminder}
+              onChange={(e) => set({ customReminder: e.target.value })}
+              placeholder="21:00"
+              inputMode="numeric"
+              aria-label="Custom reminder time"
+              style={{
+                width: 76,
+                minHeight: 40,
+                padding: '6px 9px',
+                fontSize: 14,
+                textAlign: 'center',
+                color: 'var(--mm-ink)',
+                background: 'transparent',
+                border: `1px solid ${parseClock(s.customReminder) === null ? 'var(--fb-minor)' : 'var(--mm-line)'}`,
+                borderRadius: 'var(--radius-md)',
+              }}
+            />
+            <button
+              onClick={() =>
+                set({
+                  reminders: s.reminders.includes('custom')
+                    ? s.reminders.filter((x) => x !== 'custom')
+                    : ([...s.reminders, 'custom'] as ReminderSlot[]).slice(-3),
+                })
+              }
+              aria-pressed={s.reminders.includes('custom')}
+              style={{
+                minHeight: 40,
+                minWidth: 40,
+                borderRadius: 'var(--radius-md)',
+                border: `1px solid ${s.reminders.includes('custom') ? 'var(--mm-accent)' : 'var(--mm-line)'}`,
+                background: 'transparent',
+                color: s.reminders.includes('custom') ? 'var(--mm-accent)' : 'var(--mm-muted)',
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              C
+            </button>
+          </span>
+        </Row>
+
+        <Row
+          label="Answer in the notification"
+          hint={
+            notify === 'unsupported'
+              ? 'This browser cannot show reminders'
+              : notify === 'denied'
+                ? 'Blocked — turn notifications on for this site'
+                : 'Keep your streak without opening the app'
+          }
+        >
           <Toggle
-            on={s.answerInNotification}
+            on={s.answerInNotification && notify === 'granted'}
             label="Answer in notification"
-            onChange={(v) => set({ answerInNotification: v })}
+            onChange={async (v) => {
+              if (!v) {
+                set({ answerInNotification: false });
+                return;
+              }
+              // Asking only on the way on: a permission prompt out of nowhere is
+              // how people learn to click Block.
+              const result = await askNotifyPermission();
+              setNotify(result);
+              set({ answerInNotification: result === 'granted' });
+            }}
           />
         </Row>
+
+        {/* What the schedule actually amounts to, so the setting is not a guess. */}
+        <div style={{ padding: '10px 0 2px', fontSize: 12, color: 'var(--mm-muted)', lineHeight: 1.6 }}>
+          {(() => {
+            if (!s.answerInNotification || notify !== 'granted') return 'Reminders are off.';
+            const times = slotTimes(s.reminders, s.customReminder);
+            if (times.length === 0) return 'No time slots picked yet.';
+            const last = state.progress.activeDays[state.progress.activeDays.length - 1];
+            const tier = reminderTier(last ? daysBetween(new Date(last), new Date()) : 0);
+            const next = nextReminderAt(new Date(), s.reminders, s.customReminder, tier);
+            const when = next
+              ? next.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+              : 'not scheduled';
+            const tierNote =
+              tier === 'sparse'
+                ? ' Twice a week for now, since it has been a quiet stretch.'
+                : tier === 'quiet'
+                  ? ' Asking for less at the moment — just one word.'
+                  : '';
+            return `${times.map(formatClock).join(' · ')} — next ${when}.${tierNote}`;
+          })()}
+        </div>
       </Group>
 
       <Group title="Audio">
@@ -294,6 +394,97 @@ export function Me({
             {s.plus ? 'Manage' : 'See Plus'}
           </Btn>
         </Row>
+        {/* ON-11. Anki exports as CSV or TSV from File to Export, which is what
+            this reads; an .apkg is a zipped database and is not worth a decoder
+            here. Reached from Me, never forced into onboarding. */}
+        <Row
+          label="Import words"
+          hint={
+            state.imported.length > 0
+              ? `${state.imported.length} imported so far · CSV or TSV`
+              : 'From Anki or a spreadsheet · CSV or TSV'
+          }
+        >
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 40,
+              padding: '0 14px',
+              border: '1px solid var(--mm-line)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--mm-ink)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Choose file
+            <input
+              type="file"
+              accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const text = await file.text();
+                const r = parseWordList(text, state.imported.map((w) => w.id));
+                setReport(r);
+                if (r.words.length > 0) dispatch({ type: 'importWords', words: r.words });
+                // Let the same file be chosen again after a fix.
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </Row>
+
+        {report && (
+          <div
+            className="mm-fade-up"
+            style={{
+              border: '1px solid var(--mm-line)',
+              borderRadius: 'var(--radius-md)',
+              padding: '11px 13px',
+              marginTop: 10,
+              fontSize: 12.5,
+              lineHeight: 1.65,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ flex: 1 }}>
+                {report.words.length > 0
+                  ? `Added ${report.words.length} ${report.words.length === 1 ? 'word' : 'words'} to your reviews.`
+                  : 'Nothing new to add.'}
+                {report.duplicates > 0 && ` ${report.duplicates} already in your deck.`}
+              </span>
+              <button
+                onClick={() => setReport(null)}
+                aria-label="Dismiss"
+                style={{ background: 'none', border: 0, color: 'var(--mm-muted)', cursor: 'pointer' }}
+              >
+                <Icon name="x" size={13} />
+              </button>
+            </div>
+
+            {/* Unreadable rows are named, not dropped in silence. */}
+            {report.skipped.length > 0 && (
+              <div style={{ marginTop: 8, color: 'var(--mm-muted)' }}>
+                {report.skipped.length} {report.skipped.length === 1 ? 'row' : 'rows'} skipped:
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {report.skipped.slice(0, 3).map((sk) => (
+                    <li key={sk.line}>
+                      line {sk.line} — {sk.why}
+                    </li>
+                  ))}
+                </ul>
+                {report.skipped.length > 3 && <span>and {report.skipped.length - 3} more.</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         <Row label="Export data" hint="Your words, patterns and progress as JSON">
           <Btn
             variant="secondary"

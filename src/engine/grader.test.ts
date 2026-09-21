@@ -159,3 +159,34 @@ describe('connectorGuard', () => {
     expect(connectorGuard('我明天去台北')).toBeNull();
   });
 });
+
+describe('grade — loose grading still enforces order', () => {
+  const sayit = target('time-before-verb', 'tbv-sayit-1'); // 我明天跟朋友去台北
+
+  it('does not accept the time word after the verb just because a word is missing', () => {
+    // The learner dropped 跟朋友 and put 明天 after 去. Forgiving the dropped
+    // word is fine; forgiving the order would teach the error.
+    const r = grade('我去明天台北', sayit, { loose: true });
+    expect(r.pass).toBe(false);
+    expect(r.diagnoses[0]?.code).toBe('WORD_ORDER.time_after_verb');
+  });
+
+  it('still forgives a dropped word when the order is right', () => {
+    const r = grade('我明天去台北', sayit, { loose: true });
+    expect(r.verdict).toBe('correct');
+  });
+
+  it('accepts the full sentence', () => {
+    expect(grade('我明天跟朋友去台北', sayit, { loose: true }).verdict).toBe('correct');
+  });
+
+  it('checks order on a spoken answer too', () => {
+    const r = grade('我去明天台北', sayit, { loose: true, spoken: true });
+    expect(r.pass).toBe(false);
+  });
+
+  it('says nothing about order when only one known chunk was used', () => {
+    const r = grade('我', sayit, { loose: true });
+    expect(r.diagnoses[0]?.code).not.toMatch(/^WORD_ORDER/);
+  });
+});

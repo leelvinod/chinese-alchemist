@@ -1,0 +1,24 @@
+{
+  "name": "Mandarin Mitra",
+  "short_name": "Mitra",
+  "description": "Speak Chinese in the right order, three minutes a day. With Hindi as your helper.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f2f2",
+  "theme_color": "#f3f2f2",
+  "categories": ["education"],
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Answer one sentence",
+      "short_name": "One sentence",
+      "description": "Open straight into a spoken prompt",
+      "url": "./?quick=1"
+    }
+  ]
+}

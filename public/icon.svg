@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="34" fill="#f3f2f2"/>
+  <!-- The slot skeleton, which is the product's own mark: subject, time, verb. -->
+  <rect x="30" y="74" width="30" height="10" rx="3" fill="oklch(0.47 0.11 20)"/>
+  <rect x="68" y="74" width="40" height="10" rx="3" fill="oklch(0.47 0.11 60)"/>
+  <rect x="116" y="74" width="46" height="10" rx="3" fill="oklch(0.35 0.125 300)"/>
+  <text x="96" y="140" text-anchor="middle" font-family="'Noto Sans SC',sans-serif" font-size="54" fill="#201f1d">話</text>
+</svg>

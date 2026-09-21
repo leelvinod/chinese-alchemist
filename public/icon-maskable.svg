@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" fill="#f3f2f2"/>
+  <rect x="52" y="82" width="22" height="9" rx="3" fill="oklch(0.47 0.11 20)"/>
+  <rect x="80" y="82" width="30" height="9" rx="3" fill="oklch(0.47 0.11 60)"/>
+  <rect x="116" y="82" width="26" height="9" rx="3" fill="oklch(0.35 0.125 300)"/>
+  <text x="96" y="136" text-anchor="middle" font-family="'Noto Sans SC',sans-serif" font-size="42" fill="#201f1d">話</text>
+</svg>

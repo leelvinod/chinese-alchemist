@@ -3,7 +3,7 @@
    phone frame only appears on wide screens, so the layout under test is always
    the 360–412 dp portrait one. */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StoreProvider, useStore } from './state/store';
 import { useThemeVars, useUi } from './state/useUi';
 import { Icon } from './design/Icon';
@@ -18,6 +18,9 @@ import type { PracticeRoute } from './screens/Practice';
 import { MinimalPairs, TonePairs } from './screens/Listening';
 import { HindiComposer, MiniModules, PinyinPrimer } from './screens/Bridge';
 import { Drill } from './screens/Drill';
+import { QuickAnswer } from './screens/QuickAnswer';
+import { useReminders } from './state/useReminders';
+import { clearQuickAnswerUrl, quickAnswerRequest } from './engine/notify';
 import { PATTERN_BY_ID } from './content/patterns';
 import { pickDrill } from './engine/planner';
 import { initialLadder } from './engine/ladder';
@@ -41,12 +44,41 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('today');
   const [modal, setModal] = useState<Modal>({ kind: 'none' });
 
+  // NT-01: a reminder opens the quick-answer overlay, not the home screen. The
+  // request is read once and cleared, so a reload does not reopen it.
+  const [quick, setQuick] = useState<{ drillId: string | null } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const req = quickAnswerRequest(window.location.search);
+    if (req) clearQuickAnswerUrl();
+    return req;
+  });
+
+  useReminders(useCallback((drillId: string | null) => setQuick({ drillId }), []));
+
   // Anything queued offline is checked on launch too, not only on the online event.
   useEffect(() => {
     if (state.queue.length > 0 && navigator.onLine !== false) dispatch({ type: 'drain' });
   }, [state.queue.length, dispatch]);
 
   const close = () => setModal({ kind: 'none' });
+
+  if (quick && state.onboarded) {
+    return (
+      <Frame themeVars={themeVars} ui={ui}>
+        <QuickAnswer
+          ui={ui}
+          drillId={quick.drillId}
+          onClose={() => setQuick(null)}
+          onOpenApp={(patternId) => {
+            setQuick(null);
+            setTab('today');
+            const ladder = state.progress.ladders[patternId] ?? initialLadder();
+            setModal({ kind: 'freeDrill', patternId, step: ladder.step });
+          }}
+        />
+      </Frame>
+    );
+  }
 
   if (!state.onboarded || modal.kind === 'placement') {
     return (

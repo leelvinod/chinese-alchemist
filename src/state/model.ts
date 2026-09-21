@@ -8,6 +8,7 @@ import type { LadderState } from '../engine/ladder';
 import type { Card } from '../engine/srs';
 import type { ErrorCode } from '../engine/errors';
 import type { CheckedAnswer, QueuedAnswer } from '../engine/queue';
+import type { ImportedWord } from '../engine/import';
 
 export type Goal = 'hsk' | 'work' | 'travel' | 'curious';
 
@@ -127,6 +128,8 @@ export const emptyProgress = (): Progress => ({
 
 export interface AppState {
   version: 1;
+  /** Words the learner brought in from their own list (ON-11). */
+  imported: ImportedWord[];
   /** null until onboarding finishes. */
   name: string;
   signedIn: boolean;
@@ -148,6 +151,7 @@ export const FREE_VOICE_CAP = 5;
 
 export const initialState = (): AppState => ({
   version: 1,
+  imported: [],
   name: '',
   signedIn: false,
   onboarded: false,

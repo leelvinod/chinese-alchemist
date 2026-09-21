@@ -77,7 +77,8 @@ export function ReviewRunner({
     );
   }
 
-  const w = VOCAB_BY_ID[card.wordId];
+  // Imported words share the deck with the built-in ones, so both are resolved.
+  const w = VOCAB_BY_ID[card.wordId] ?? state.imported.find((x) => x.id === card.wordId);
   if (!w) {
     // A card whose word has left the content set is skipped rather than shown blank.
     return (

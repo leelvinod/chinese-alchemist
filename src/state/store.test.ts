@@ -250,3 +250,47 @@ describe('newCard', () => {
     expect(c.mastered).toBe(false);
   });
 });
+
+describe('importWords', () => {
+  const words = [
+    {
+      id: 'imp-词典',
+      zh: '词典',
+      py: 'cídiǎn',
+      en: 'dictionary',
+      hsk: 1 as const,
+      example: '{词典}',
+      examplePy: 'cídiǎn',
+      exampleEn: 'dictionary',
+      imported: true as const,
+    },
+  ];
+
+  it('adds the word and its three review facets', () => {
+    const s = reducer(onboarded(), { type: 'importWords', words });
+    expect(s.imported).toHaveLength(1);
+    expect(s.progress.cards.filter((c) => c.wordId === 'imp-词典')).toHaveLength(3);
+  });
+
+  it('counts an imported word as seen, so it lands in know-vs-use', () => {
+    const s = reducer(onboarded(), { type: 'importWords', words });
+    expect(s.progress.seenWords).toContain('imp-词典');
+  });
+
+  it('is a no-op when the word is already imported', () => {
+    const once = reducer(onboarded(), { type: 'importWords', words });
+    expect(reducer(once, { type: 'importWords', words })).toBe(once);
+  });
+
+  it('leaves the built-in deck alone', () => {
+    const before = onboarded();
+    const after = reducer(before, { type: 'importWords', words });
+    expect(after.progress.cards.length).toBe(before.progress.cards.length + 3);
+  });
+
+  it('clears imported words on reset', () => {
+    let s = reducer(onboarded(), { type: 'importWords', words });
+    s = reducer(s, { type: 'reset' });
+    expect(s.imported).toHaveLength(0);
+  });
+});
