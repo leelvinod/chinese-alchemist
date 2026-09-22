@@ -5,17 +5,46 @@ import { useStore } from './store';
 import type { Ui } from '../design/slots';
 import { MM_THEME } from '../design/slots';
 
+/* "System" means the surface the app is running on, and that is not always the
+   OS. A host page can state a theme explicitly by stamping data-theme on the
+   root element, and when it does, that beats prefers-color-scheme — the viewer
+   chose it. Falling back to the media query covers the ordinary case. */
+function readHostTheme(): 'dark' | 'light' | null {
+  if (typeof document === 'undefined') return null;
+  const stamped = document.documentElement.dataset.theme;
+  return stamped === 'dark' || stamped === 'light' ? stamped : null;
+}
+
+function readSystemDark(): boolean {
+  const host = readHostTheme();
+  if (host) return host === 'dark';
+  return typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)').matches : false;
+}
+
 export function usePrefersDark(): boolean {
-  const [dark, setDark] = useState(() =>
-    typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)').matches : false,
-  );
+  const [dark, setDark] = useState(readSystemDark);
+
   useEffect(() => {
-    if (typeof matchMedia !== 'function') return;
-    const mq = matchMedia('(prefers-color-scheme: dark)');
-    const on = (e: MediaQueryListEvent) => setDark(e.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    const sync = () => setDark(readSystemDark());
+
+    const mq = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+    mq?.addEventListener('change', sync);
+
+    // The host can restamp the root at any time, so the attribute is watched
+    // rather than read once at mount.
+    const observer =
+      typeof MutationObserver === 'function' && typeof document !== 'undefined'
+        ? new MutationObserver(sync)
+        : null;
+    observer?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    sync();
+    return () => {
+      mq?.removeEventListener('change', sync);
+      observer?.disconnect();
+    };
   }, []);
+
   return dark;
 }
 
