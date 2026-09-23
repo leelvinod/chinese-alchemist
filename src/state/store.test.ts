@@ -294,3 +294,39 @@ describe('importWords', () => {
     expect(s.imported).toHaveLength(0);
   });
 });
+
+describe('setLevel — choosing a level instead of sitting the check', () => {
+  it('records the level and counts placement as settled', () => {
+    const s = reducer(onboarded(), { type: 'setLevel', hsk: 4 });
+    expect(s.hsk).toBe(4);
+    expect(s.placementDone).toBe(true);
+  });
+
+  it('opens the vocabulary that the new level reaches', () => {
+    const before = onboarded(); // placed at HSK 2
+    expect(before.progress.seenWords).not.toContain('v-zhide'); // HSK 4
+    const after = reducer(before, { type: 'setLevel', hsk: 4 });
+    expect(after.progress.seenWords).toContain('v-zhide');
+    expect(after.progress.cards.filter((c) => c.wordId === 'v-zhide')).toHaveLength(3);
+  });
+
+  it('does not duplicate cards the learner already has', () => {
+    const before = onboarded();
+    const after = reducer(before, { type: 'setLevel', hsk: 4 });
+    const ids = after.progress.cards.map((c) => `${c.wordId}:${c.facet}`);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keeps progress when the level is lowered', () => {
+    let s = reducer(onboarded(), attempt(true));
+    s = reducer(s, { type: 'setLevel', hsk: 1 });
+    expect(s.hsk).toBe(1);
+    expect(s.progress.attempts).toHaveLength(1);
+    expect(s.progress.streak).toBe(1);
+  });
+
+  it('is a no-op when the level has not changed', () => {
+    const s = onboarded();
+    expect(reducer(s, { type: 'setLevel', hsk: s.hsk })).toBe(s);
+  });
+});

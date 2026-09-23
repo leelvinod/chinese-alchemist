@@ -23,7 +23,7 @@ export function Today({
   onListening: () => void;
   onResumePlacement: () => void;
 }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, storageWorks } = useStore();
   const online = useOnline();
   const p = state.progress;
 
@@ -53,6 +53,17 @@ export function Today({
         </div>
         {p.streak > 0 && <Chip icon="flame">{p.streak}</Chip>}
       </div>
+
+      {/* Signing in and practising look fine without storage, right up until a
+          reload throws it all away — so say it plainly instead. */}
+      {!storageWorks && (
+        <div style={{ marginTop: 16 }}>
+          <Banner icon="lock">
+            This browser is blocking saved data, so today's progress will not survive a reload. Turn on
+            site data, or leave this tab open.
+          </Banner>
+        </div>
+      )}
 
       {/* Results that landed while the learner was offline. */}
       {state.checked.length > 0 && (

@@ -13,7 +13,7 @@ Chinese sentence, get corrected in two steps, and watch your weak spots shrink.
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 257 tests
+npm test           # 280 tests
 npm run build      # typecheck + production build
 ```
 
@@ -108,8 +108,17 @@ real one drops in behind the same interface:
 - **Payment.** The paywall flips a local entitlement. No provider is wired up, so
   UPI and card are labels rather than flows.
 
-Accounts are local too: sign-in takes a name and a phone number and no OTP is
-sent. Everything persists to `localStorage`, so progress is per-device.
+Accounts are local too. Sign-in has both paths the spec asks for — Google, and
+phone with a 6-digit code — and every validation rule is real and tested, but
+there is no auth service behind it: no SMS is sent, and the code screen says so
+outright rather than leaving a learner waiting. Everything persists to
+`localStorage`, so progress is per-device; if a browser blocks storage the app
+says so on Today instead of silently losing the session on reload.
+
+Placement can be skipped in two ways: **I know my level** opens a picker showing
+what each HSK band means with a real sentence from it, and **Skip for now**
+starts at HSK 1. The level is changeable any time from Me, without re-sitting
+the check.
 
 **Notifications** work while the app has been opened at least once in the
 session; there is no push server, so reminders are scheduled in the page rather
@@ -140,7 +149,7 @@ and the tap opens the overlay that holds the mic.
 
 ## Verification
 
-257 tests cover the grader, pronunciation diagnosis, ladder, scheduler, planner,
+280 tests cover the grader, sign-in rules, pronunciation diagnosis, ladder, scheduler, planner,
 placement, reminders, word import, the store and content integrity
 (`npm test`). The build is typechecked under `strict` with
 `noUncheckedIndexedAccess`.

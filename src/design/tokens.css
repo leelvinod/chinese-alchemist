@@ -99,6 +99,13 @@ textarea {
   background: color-mix(in srgb, var(--mm-accent, var(--color-accent)) 30%, transparent);
 }
 
+/* A large, spaced code field makes its own placeholder look like a filled-in
+   value, so this one is faded well past the browser default. */
+.mm-code::placeholder {
+  color: var(--mm-muted);
+  opacity: 0.32;
+}
+
 /* Figures — streaks, due counts, intervals, timers — are always tabular. */
 .mm-num {
   font-variant-numeric: tabular-nums;

@@ -13,8 +13,18 @@ import { useStore } from '../state/store';
 import { GOAL_ICON, GOAL_LABEL } from '../state/model';
 import type { Goal, ReminderSlot, Settings } from '../state/model';
 import { initialPlacement, nextItem, record, score } from '../engine/placement';
+import {
+  OTP_LENGTH,
+  checkPhone,
+  cleanName,
+  cleanOtpInput,
+  displayPhone,
+  isValidOtp,
+  phoneProblemMessage,
+} from '../engine/auth';
 import type { PlacementState } from '../engine/placement';
 import type { HskLevel, PlacementItem } from '../content/types';
+import { PATTERNS } from '../content/patterns';
 import { normalise } from '../engine/grader';
 import { createTts, micPermission } from '../engine/speech';
 import { MicButton } from './MicButton';
@@ -22,12 +32,14 @@ import { MicButton } from './MicButton';
 type Step =
   | 'welcome'
   | 'signin'
+  | 'otp'
   | 'goal'
   | 'helper'
   | 'script'
   | 'mic'
   | 'placementIntro'
   | 'placement'
+  | 'pickLevel'
   | 'result'
   | 'reminders';
 
@@ -107,6 +119,10 @@ export function Onboarding({ ui }: { ui: Ui }) {
   const [step, setStep] = useState<Step>(state.signedIn ? 'goal' : 'welcome');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [resent, setResent] = useState(false);
   const tts = useMemo(() => createTts(), []);
 
   const s = state.settings;
@@ -141,62 +157,216 @@ export function Onboarding({ ui }: { ui: Ui }) {
   }
 
   if (step === 'signin') {
-    const ready = name.trim().length > 0;
+    const problem = checkPhone(phone);
+    const phoneMessage = phoneTouched ? phoneProblemMessage(problem) : null;
+    const phoneReady = problem === null;
+
     return (
       <Screen>
         <TopBar onClose={() => go('welcome')} closeIcon="chevronLeft" title="Sign in" />
         <Title>Sign in</Title>
         <Sub>Your progress rides along with you.</Sub>
 
+        {/* Google first and on its own: it needs nothing typed, so nothing is
+            allowed to gate it. */}
         <div style={{ marginTop: 24 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--mm-muted)', marginBottom: 6 }}>
-            Your first name
+          <Btn
+            variant="secondary"
+            onClick={() => {
+              dispatch({ type: 'signIn', name: cleanName(name) });
+              go('goal');
+            }}
+          >
+            <Icon name="user" size={16} />
+            Continue with Google
+          </Btn>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 4px' }}>
+          <span style={{ flex: 1, height: 1, background: 'var(--mm-line)' }} />
+          <span style={{ fontSize: 11, color: 'var(--mm-muted)' }}>or use your number</span>
+          <span style={{ flex: 1, height: 1, background: 'var(--mm-line)' }} />
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <label
+            htmlFor="mm-phone"
+            style={{ display: 'block', fontSize: 12, color: 'var(--mm-muted)', marginBottom: 6 }}
+          >
+            Phone number
           </label>
           <input
+            id="mm-phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => setPhoneTouched(true)}
+            placeholder="+91 98765 43210"
+            inputMode="tel"
+            autoComplete="tel"
+            aria-invalid={!!phoneMessage}
+            aria-describedby="mm-phone-note"
+            style={{ ...inputStyle, borderColor: phoneMessage ? 'var(--fb-minor)' : 'var(--mm-line)' }}
+          />
+          <div
+            id="mm-phone-note"
+            style={{
+              fontSize: 11.5,
+              color: phoneMessage ? 'var(--fb-minor)' : 'var(--mm-muted)',
+              marginTop: 6,
+              minHeight: 17,
+            }}
+          >
+            {phoneMessage ?? "We'll send a one-time code. No password to remember."}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <label
+            htmlFor="mm-name"
+            style={{ display: 'block', fontSize: 12, color: 'var(--mm-muted)', marginBottom: 6 }}
+          >
+            Your first name <span style={{ opacity: 0.7 }}>· optional</span>
+          </label>
+          <input
+            id="mm-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Priya"
             autoComplete="given-name"
             style={inputStyle}
           />
-        </div>
-
-        <div style={{ marginTop: 18 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--mm-muted)', marginBottom: 6 }}>
-            Phone number
-          </label>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91"
-            inputMode="tel"
-            autoComplete="tel"
-            style={inputStyle}
-          />
           <div style={{ fontSize: 11.5, color: 'var(--mm-muted)', marginTop: 6 }}>
-            We'll send a one-time code. No password to remember.
+            Only used to greet you.
           </div>
         </div>
 
-        <div style={{ marginTop: 'auto', padding: '16px 0 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ marginTop: 'auto', padding: '16px 0 22px' }}>
           <Btn
-            disabled={!ready}
+            disabled={!phoneReady}
             onClick={() => {
-              dispatch({ type: 'signIn', name: name.trim() });
-              go('goal');
+              setOtp('');
+              setOtpError(null);
+              setResent(false);
+              go('otp');
             }}
           >
-            Continue with phone
+            Send me a code
           </Btn>
+          {/* A disabled button always says why, so it never reads as broken. */}
+          {!phoneReady && (
+            <p style={{ fontSize: 11.5, color: 'var(--mm-muted)', textAlign: 'center', marginTop: 8 }}>
+              {problem === 'empty' ? 'Enter your number to get a code.' : 'Check the number above.'}
+            </p>
+          )}
+        </div>
+      </Screen>
+    );
+  }
+
+  if (step === 'otp') {
+    const ready = isValidOtp(otp);
+    return (
+      <Screen>
+        <TopBar onClose={() => go('signin')} closeIcon="chevronLeft" title="Sign in" />
+        <Title>Enter your code</Title>
+        <Sub>
+          Sent to {displayPhone(phone)}.{' '}
+          <button
+            onClick={() => go('signin')}
+            style={{
+              background: 'none',
+              border: 0,
+              padding: 0,
+              color: 'var(--mm-accent)',
+              cursor: 'pointer',
+              font: 'inherit',
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+            }}
+          >
+            Change number
+          </button>
+        </Sub>
+
+        <div style={{ marginTop: 24 }}>
+          <label
+            htmlFor="mm-otp"
+            style={{ display: 'block', fontSize: 12, color: 'var(--mm-muted)', marginBottom: 6 }}
+          >
+            {OTP_LENGTH}-digit code
+          </label>
+          <input
+            id="mm-otp"
+            className="mm-code"
+            value={otp}
+            onChange={(e) => {
+              setOtp(cleanOtpInput(e.target.value));
+              setOtpError(null);
+            }}
+            placeholder="123456"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-invalid={!!otpError}
+            style={{
+              ...inputStyle,
+              fontSize: 26,
+              letterSpacing: '0.34em',
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+              borderColor: otpError ? 'var(--fb-minor)' : 'var(--mm-line)',
+            }}
+          />
+          <div style={{ fontSize: 11.5, color: otpError ? 'var(--fb-minor)' : 'var(--mm-muted)', marginTop: 8, minHeight: 17 }}>
+            {otpError ?? (resent ? 'Code sent again.' : ' ')}
+          </div>
+        </div>
+
+        {/* No auth backend exists yet, so the app says that outright rather than
+            leaving the learner waiting for an SMS that is never coming. */}
+        <div
+          style={{
+            marginTop: 8,
+            border: '1px solid var(--mm-line)',
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 12px',
+            fontSize: 12,
+            lineHeight: 1.6,
+            color: 'var(--mm-muted)',
+          }}
+        >
+          This build has no SMS service behind it, so no code was actually sent. Type any{' '}
+          {OTP_LENGTH} digits to continue.
+        </div>
+
+        <div style={{ marginTop: 'auto', padding: '16px 0 22px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Btn
-            variant="secondary"
             disabled={!ready}
             onClick={() => {
-              dispatch({ type: 'signIn', name: name.trim() });
+              if (!isValidOtp(otp)) {
+                setOtpError(`The code is ${OTP_LENGTH} digits.`);
+                return;
+              }
+              dispatch({ type: 'signIn', name: cleanName(name) });
               go('goal');
             }}
           >
-            Continue with Google
+            Verify and continue
+          </Btn>
+          {!ready && (
+            <p style={{ fontSize: 11.5, color: 'var(--mm-muted)', textAlign: 'center' }}>
+              {otp.length === 0
+                ? `Enter the ${OTP_LENGTH}-digit code.`
+                : `${OTP_LENGTH - otp.length} more ${OTP_LENGTH - otp.length === 1 ? 'digit' : 'digits'}.`}
+            </p>
+          )}
+          <Btn
+            variant="ghost"
+            onClick={() => {
+              setResent(true);
+              setOtpError(null);
+            }}
+          >
+            Resend the code
           </Btn>
         </div>
       </Screen>
@@ -356,6 +526,11 @@ export function Onboarding({ ui }: { ui: Ui }) {
         </Sub>
         <div style={{ marginTop: 'auto', padding: '16px 0 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Btn onClick={() => go('placement')}>Start the check</Btn>
+          {/* Plenty of learners already know roughly where they are, and making
+              them sit an eight-minute quiz to say so is a poor trade. */}
+          <Btn variant="secondary" onClick={() => go('pickLevel')}>
+            I know my level — let me pick
+          </Btn>
           <Btn
             variant="ghost"
             onClick={() => {
@@ -363,10 +538,28 @@ export function Onboarding({ ui }: { ui: Ui }) {
               go('reminders');
             }}
           >
-            Skip — start me at HSK 1
+            Skip for now — start at HSK 1
           </Btn>
         </div>
       </Screen>
+    );
+  }
+
+  if (step === 'pickLevel') {
+    return (
+      <LevelPicker
+        ui={ui}
+        current={state.hsk}
+        onBack={() => go('placementIntro')}
+        onPick={(hsk) => {
+          dispatch({
+            type: 'finishPlacement',
+            hsk,
+            note: { strongest: 'You told us', weakest: 'Not measured yet', speakingTested: false },
+          });
+          go('reminders');
+        }}
+      />
     );
   }
 
@@ -709,5 +902,107 @@ function PlacementSpoken({ item, onSubmit }: { item: PlacementItem; onSubmit: (h
         </Btn>
       </div>
     </>
+  );
+}
+
+/* ── Choosing a level instead of sitting the check ──────────────────────── */
+
+interface LevelBand {
+  hsk: HskLevel;
+  name: string;
+  blurb: string;
+  words: string;
+}
+
+/** What each level means in terms a learner can recognise about themselves,
+ *  rather than a syllabus number. Each band shows a sentence from its own
+ *  patterns, so the choice is made against real Chinese and not a guess. */
+const LEVEL_BANDS: LevelBand[] = [
+  { hsk: 1, name: 'Starting out', blurb: 'You know a few words and want the basic sentence in the right order.', words: 'about 150 words' },
+  { hsk: 2, name: 'Getting by', blurb: 'You can say what you did and how many, and you want it to sound right.', words: 'about 300 words' },
+  { hsk: 3, name: 'Holding a conversation', blurb: 'You can talk about most everyday things and want the finer word order.', words: 'about 600 words' },
+  { hsk: 4, name: 'Comfortable', blurb: 'You read and talk freely; you are after the structures that still sound translated.', words: 'about 1,200 words' },
+];
+
+function LevelPicker({
+  ui,
+  current,
+  onBack,
+  onPick,
+}: {
+  ui: Ui;
+  current: HskLevel;
+  onBack: () => void;
+  onPick: (hsk: HskLevel) => void;
+}) {
+  const [picked, setPicked] = useState<HskLevel>(current);
+  const sample = (hsk: HskLevel) => PATTERNS.find((p) => p.hsk === hsk)?.examples[0];
+
+  return (
+    <Screen>
+      <TopBar onClose={onBack} closeIcon="chevronLeft" title="Your level" />
+      <Title>Where are you now?</Title>
+      <Sub>Pick the one that sounds most like you. You can change it any time in Me.</Sub>
+
+      <div style={{ marginTop: 20 }}>
+        {LEVEL_BANDS.map((band) => {
+          const on = picked === band.hsk;
+          const ex = sample(band.hsk);
+          return (
+            <button
+              key={band.hsk}
+              onClick={() => setPicked(band.hsk)}
+              aria-pressed={on}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                padding: '13px 14px',
+                marginBottom: 10,
+                borderRadius: 'var(--radius-md)',
+                border: `1px solid ${on ? 'var(--mm-accent)' : 'var(--mm-line)'}`,
+                background: on ? 'color-mix(in srgb, var(--mm-accent) 9%, transparent)' : 'transparent',
+                color: 'var(--mm-ink)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: 16, flex: 1 }}>
+                  {band.name}
+                </span>
+                <span className="mm-num" style={{ fontSize: 11, color: on ? 'var(--mm-accent)' : 'var(--mm-muted)' }}>
+                  HSK {band.hsk}
+                </span>
+              </span>
+              <span style={{ display: 'block', fontSize: 12.5, color: 'var(--mm-muted)', lineHeight: 1.55, marginTop: 4 }}>
+                {band.blurb}
+              </span>
+              {/* A real sentence from that level beats any description of it. */}
+              {ex && (
+                <span style={{ display: 'block', marginTop: 10 }}>
+                  <SentenceLine
+                    chunks={ex.chunks}
+                    ui={{ ...ui, pinyin: true }}
+                    size={17}
+                    gap={6}
+                    justify="flex-start"
+                    showHindi={false}
+                    state={on ? undefined : 'plain'}
+                  />
+                </span>
+              )}
+              <span className="mm-num" style={{ display: 'block', fontSize: 11, color: 'var(--mm-muted)', marginTop: 8 }}>
+                {band.words}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 'auto', padding: '16px 0 22px' }}>
+        <Btn onClick={() => onPick(picked)}>Start at HSK {picked}</Btn>
+      </div>
+    </Screen>
   );
 }

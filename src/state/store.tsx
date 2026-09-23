@@ -2,7 +2,7 @@
    A reducer over AppState, persisted to localStorage on every change. Actions
    are named after what the learner did, not after the fields they touch. */
 
-import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import { createContext, useContext, useEffect, useMemo, useReducer, useState } from 'react';
 import type { Dispatch, ReactNode } from 'react';
 import { FREE_VOICE_CAP, initialState, todayISO } from './model';
 import type { AppState, Settings } from './model';
@@ -45,6 +45,7 @@ export type Action =
   | { type: 'tonePairResult'; key: string; right: boolean }
   | { type: 'minimalPairResult'; contrast: string; right: boolean }
   | { type: 'dismissTransfer'; id: string }
+  | { type: 'setLevel'; hsk: HskLevel }
   | { type: 'importWords'; words: ImportedWord[] }
   | { type: 'reset' };
 
@@ -82,6 +83,25 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'skipPlacement':
       return { ...state, placementSkipped: true, hsk: 1 };
+
+    case 'setLevel': {
+      if (action.hsk === state.hsk) return state;
+      // A level change opens new vocabulary, so the deck grows to match rather
+      // than waiting for the next onboarding.
+      const words = VOCAB.filter((w) => w.hsk <= action.hsk).map((w) => w.id);
+      const have = new Set(state.progress.cards.map((c) => c.wordId));
+      const add = words.filter((id) => !have.has(id));
+      return {
+        ...state,
+        hsk: action.hsk,
+        placementDone: true,
+        progress: {
+          ...state.progress,
+          cards: [...state.progress.cards, ...add.flatMap(cardsFor)],
+          seenWords: [...new Set([...state.progress.seenWords, ...words])],
+        },
+      };
+    }
 
     case 'finishOnboarding': {
       // Seed the review deck from the learner's level so Today has something due.
@@ -288,19 +308,26 @@ interface Ctx {
   dispatch: Dispatch<Action>;
   /** Voice answers left on the free plan today. */
   voiceLeft: number;
+  /** False when the browser will not let us save — progress lasts this session
+   *  only, and the learner is told rather than left to discover it on reload. */
+  storageWorks: boolean;
 }
 
 const StoreContext = createContext<Ctx | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, load);
+  const [storageWorks, setStorageWorks] = useState(true);
 
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
+      setStorageWorks(true);
     } catch {
-      // A full or blocked store must not break the session; the learner keeps
-      // practising, and progress is simply not carried to the next launch.
+      // A full or blocked store must not break the session: the learner keeps
+      // practising. But it must not be silent either, or signing in appears to
+      // work and then quietly undoes itself on the next reload.
+      setStorageWorks(false);
     }
   }, [state]);
 
@@ -318,8 +345,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       state,
       dispatch,
       voiceLeft: state.settings.plus ? Infinity : Math.max(0, FREE_VOICE_CAP - used),
+      storageWorks,
     };
-  }, [state]);
+  }, [state, storageWorks]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

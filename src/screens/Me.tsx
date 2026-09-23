@@ -8,6 +8,7 @@ import { Icon } from '../design/Icon';
 import { MM_DV, MM_PY, MM_ZH } from '../design/slots';
 import { useStore } from '../state/store';
 import { FREE_VOICE_CAP, GOAL_LABEL } from '../state/model';
+import type { HskLevel } from '../content/types';
 import { askNotifyPermission, notifyPermission } from '../engine/notify';
 import { parseWordList } from '../engine/import';
 import type { ImportReport } from '../engine/import';
@@ -162,10 +163,23 @@ export function Me({
             labels={{ hsk: 'HSK', work: 'Work', travel: 'Travel', curious: 'Curious' }}
           />
         </Row>
+        {/* Set it directly or sit the check again — knowing your own level is
+            not a reason to spend eight minutes proving it. */}
         <Row label="Level" hint={`Currently HSK ${state.hsk}`}>
-          <Btn variant="secondary" style={{ width: 'auto', minHeight: 40, fontSize: 13 }} onClick={onRetakePlacement}>
-            Re-take
-          </Btn>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Segmented
+              value={state.hsk}
+              options={[1, 2, 3, 4] as HskLevel[]}
+              onChange={(hsk) => dispatch({ type: 'setLevel', hsk })}
+            />
+            <Btn
+              variant="secondary"
+              style={{ width: 'auto', minHeight: 40, fontSize: 13 }}
+              onClick={onRetakePlacement}
+            >
+              Check
+            </Btn>
+          </span>
         </Row>
         <Row label="Daily review cap" hint="Reviews are spread, never stacked">
           <Segmented value={s.reviewCap} options={[20, 40, 80]} onChange={(v) => set({ reviewCap: v })} />
